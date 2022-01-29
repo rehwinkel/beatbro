@@ -1,42 +1,42 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
 const { REST } = require('@discordjs/rest');
 const { Routes } = require('discord-api-types/v9');
-const { clientId, token } = require('./config.json');
+
+require('dotenv').config();
+
+const token = process.env.BOT_TOKEN;
+const clientId = process.env.CLIENT_ID;
+const guildId = process.env.GUILD_ID;
 
 const processCli = (args) => {
-    if (args.length < 3) {
-        console.log("usage: " + args[0] + " " + args[1] + " <global|guild> [guildId]");
+    if (args.length != 3) {
+        console.log("usage: " + args[0] + " " + args[1] + " <global|guild>");
         process.exit(1);
     }
     let deploymentKind = args[2];
     if (deploymentKind == "global") {
-        if (args.length != 3) {
-            console.log("usage: " + args[0] + " " + args[1] + " global");
-            process.exit(1);
-        } else {
-            return null;
-        }
+        return null;
     } else if (deploymentKind == "guild") {
-        if (args.length != 4) {
-            console.log("usage: " + args[0] + " " + args[1] + " guild <guildId>");
+        if (!guildId) {
+            console.log("Environment variable GUILD_ID not set!");
             process.exit(1);
-        } else {
-            return args[3];
         }
     } else {
-        console.log("usage: " + args[0] + " " + args[1] + " <global|guild> [guildId]");
+        console.log("usage: " + args[0] + " " + args[1] + " <global|guild>");
         process.exit(1);
     }
 }
 
-let guildId = processCli(process.argv);
+processCli(process.argv);
 
 const commands = [
-        new SlashCommandBuilder().setName('global').setDescription('Replies with pong!'),
-        new SlashCommandBuilder().setName('cmd').setDescription('Replies with server info!'),
-        new SlashCommandBuilder().setName('test').setDescription('Replies with user info!'),
-    ]
-    .map(command => command.toJSON());
+    new SlashCommandBuilder().setName('join').setDescription('Joins your channel to play music.'),
+    new SlashCommandBuilder().setName('leave').setDescription('Makes the bot leave it\'s channel.'),
+    new SlashCommandBuilder().setName('playlist').setDescription('Shows the current playlist.'),
+    new SlashCommandBuilder().setName('skip').setDescription('Skips the currently playing song.'),
+    new SlashCommandBuilder().setName('play').setDescription('Adds a song to the playlist.')
+        .addStringOption(opt => opt.setName("query").setDescription("The query string for the song to play.").setRequired(true)),
+].map(command => command.toJSON());
 
 const rest = new REST({ version: '9' }).setToken(token);
 
