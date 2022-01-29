@@ -113,7 +113,13 @@ const playVideo = async (guildId, video, connection) => {
                 noSubscriber: NoSubscriberBehavior.Pause,
             },
         });
-        const resource = createAudioResource(videoExtra.streamUrl);
+        let resource;
+        if (video.volume == 1) {
+            resource = createAudioResource(videoExtra.streamUrl);
+        } else {
+            resource = createAudioResource(videoExtra.streamUrl, { inlineVolume: true });
+            resource.volume.setVolume(video.volume);
+        }
         audioPlayer.play(resource);
         const subscription = connection.subscribe(audioPlayer);
         audioPlayer.on(AudioPlayerStatus.Idle, async () => {
@@ -210,8 +216,14 @@ const handlePlay = async (interaction) => {
     } else {
         await interaction.deferReply();
         const query = interaction.options.getString("query");
+        const volume = interaction.options.getNumber("volume");
         let video = await searchList(youtube, query);
         video.title = he.decode(video.title);
+        if (volume) {
+            video.volume = volume;
+        } else {
+            video.volume = 1;
+        }
         let current = await currentlyPlaying(interaction.guild.id);
         if (current) {
             logger.info("Getting stream asynchronously...");
@@ -227,7 +239,12 @@ const handlePlay = async (interaction) => {
             logger.info("Got stream");
         }
         if (video) {
-            let reply = `Added "${video.title}" by "${video.creator}" to the Playlist! :notes:`;
+            let reply;
+            if (video.volume == 1) {
+                reply = `Added "${video.title}" by "${video.creator}" volume to the Playlist! :notes:`;
+            } else {
+                reply = `Added "${video.title}" by "${video.creator}" at ${video.volume}x volume to the Playlist! :notes:`;
+            }
             let msg = await interaction.editReply({ content: reply, files: [video.thumb] });
             video["msg"] = msg.id;
             video["channel"] = msg.channelId;
@@ -264,13 +281,21 @@ const handlePlaylist = async (interaction) => {
 };
 
 const handleSkip = async (interaction) => {
+    // TODO: end song if no next song in queue
     let current = await currentlyPlaying(interaction.guild.id);
     if (current) {
-        interaction.reply("Skipping current song!");
+        await interaction.reply("Skipping current song!");
     } else {
-        interaction.reply("Can\'t skip, currently not playing.")
+        await interaction.reply("Can\'t skip, currently not playing.")
     }
     await playNextVideo(interaction.guild.id, true);
+};
+
+const handleClear = async (interaction) => {
+    await db.flushAll();
+    let connection = getVoiceConnection(interaction.guild.id);
+    //TODO: stop audio player // connection.subscribe
+    await interaction.reply("Cleared playlist and current song!");
 };
 
 client.on('interactionCreate', async interaction => {
@@ -288,6 +313,8 @@ client.on('interactionCreate', async interaction => {
         handlePlaylist(interaction);
     } else if (commandName === 'skip') {
         handleSkip(interaction);
+    } else if (commandName === 'clear') {
+        handleClear(interaction);
     }
 });
 

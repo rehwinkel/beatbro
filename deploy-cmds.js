@@ -34,8 +34,10 @@ const commands = [
     new SlashCommandBuilder().setName('leave').setDescription('Makes the bot leave it\'s channel.'),
     new SlashCommandBuilder().setName('playlist').setDescription('Shows the current playlist.'),
     new SlashCommandBuilder().setName('skip').setDescription('Skips the currently playing song.'),
+    new SlashCommandBuilder().setName('clear').setDescription('Clears the playlist and the current song.'),
     new SlashCommandBuilder().setName('play').setDescription('Adds a song to the playlist.')
-        .addStringOption(opt => opt.setName("query").setDescription("The query string for the song to play.").setRequired(true)),
+        .addStringOption(opt => opt.setName("query").setDescription("The query string for the song to play.").setRequired(true))
+        .addNumberOption(opt => opt.setName("volume").setDescription("The volume multiplyer for this song.")),
 ].map(command => command.toJSON());
 
 const rest = new REST({ version: '9' }).setToken(token);
