@@ -101,15 +101,19 @@ const playVideo = async (guildId, video, connection) => {
         let channel = await client.channels.fetch(video.channel);
         let message = await channel.messages.fetch(video.msg);
         await updatePlaying(guildId, video);
-        await message.reply(`Now playing "${video.title}" by "${video.creator}" [${durationString(video.duration)}]! :notes:`);
+        let videoExtra = await getVideoExtra(video.videoId);
+        if (!videoExtra) {
+            logger.info("Stream extra missing, reloading");
+            videoExtra = await getYoutubeStream(video.videoId);
+        }
+        await message.reply(`Now playing "${video.title}" by "${video.creator}" [${durationString(videoExtra.duration)}]! :notes:`);
 
-        // TODO: start player and update after done
         const audioPlayer = createAudioPlayer({
             behaviors: {
                 noSubscriber: NoSubscriberBehavior.Pause,
             },
         });
-        const resource = createAudioResource(video.streamUrl);
+        const resource = createAudioResource(videoExtra.streamUrl);
         audioPlayer.play(resource);
         const subscription = connection.subscribe(audioPlayer);
         audioPlayer.on(AudioPlayerStatus.Idle, async () => {
@@ -191,6 +195,14 @@ const currentlyPlaying = async (guildId) => {
     return JSON.parse(await db.get("playing" + guildId));
 };
 
+const addVideoExtra = async (videoId, duration, streamUrl) => {
+    await db.set("stream" + videoId, JSON.stringify({ duration, streamUrl }));
+};
+
+const getVideoExtra = async (videoId) => {
+    return JSON.parse(await db.get("stream" + videoId));
+};
+
 const handlePlay = async (interaction) => {
     const connection = getVoiceConnection(interaction.guild.id);
     if (!connection) {
@@ -200,11 +212,22 @@ const handlePlay = async (interaction) => {
         const query = interaction.options.getString("query");
         let video = await searchList(youtube, query);
         video.title = he.decode(video.title);
-        let { duration, url } = await getYoutubeStream(video.videoId);
-        video["streamUrl"] = url;
-        video["duration"] = duration;
+        let current = await currentlyPlaying(interaction.guild.id);
+        if (current) {
+            logger.info("Getting stream asynchronously...");
+            getYoutubeStream(video.videoId).then(async (values) => {
+                let { duration, url } = values;
+                await addVideoExtra(video.videoId, duration, url);
+                logger.info("Got stream");
+            });
+        } else {
+            logger.info("Getting stream awaitingly...");
+            let { duration, url } = await getYoutubeStream(video.videoId);
+            await addVideoExtra(video.videoId, duration, url);
+            logger.info("Got stream");
+        }
         if (video) {
-            let reply = `Added "${video.title}" by "${video.creator}" [${durationString(duration)}] to the Playlist! :notes:`;
+            let reply = `Added "${video.title}" by "${video.creator}" to the Playlist! :notes:`;
             let msg = await interaction.editReply({ content: reply, files: [video.thumb] });
             video["msg"] = msg.id;
             video["channel"] = msg.channelId;
@@ -222,7 +245,7 @@ const handlePlaylist = async (interaction) => {
     let current = await currentlyPlaying(interaction.guild.id);
     let message;
     if (current) {
-        message = `Currently playing: "${current.title}" by "${current.creator}" [${durationString(current.duration)}]\n\n`;
+        message = `Currently playing: "${current.title}" by "${current.creator}"\n\n`;
     } else {
         message = "Currently not playing!\n\n";
     }
