@@ -4,7 +4,7 @@
     "description": "Music bot for discord",
     "main": "index.js",
     "scripts": {
-        "start": "node index.js",
+        "start": "yarn tsc index.ts && node index.js",
         "devDeploy": "node deploy-cmds.js guild",
         "prodDeploy": "node deploy-cmds.js global"
     },
@@ -23,6 +23,7 @@
         "he": "^1.2.0",
         "libsodium-wrappers": "^0.7.9",
         "redis": "^4.0.2",
+        "typescript": "^4.9.5",
         "winston": "^3.5.0"
     }
 }

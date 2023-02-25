@@ -54,7 +54,7 @@ client.once('ready', () => {
 });
 
 const getYoutubeStream = async (videoId) => {
-    let result = await asyncExec("./youtube-dl --dump-json https://www.youtube.com/watch?v=" + videoId);
+    let result = await asyncExec("./yt-dlp --dump-json https://www.youtube.com/watch?v=" + videoId);
     let { stdout } = result;
     let info = JSON.parse(stdout);
     const durationSecs = info.duration;
@@ -66,13 +66,14 @@ const getYoutubeStream = async (videoId) => {
     return null;
 };
 
-const playNextVideo = async (guildId, force) => {
+const playNextVideo = async (guildId, force: boolean) => {
     logger.info("Playing next video");
     let current = await currentlyPlaying(guildId);
     if (!current || force) {
         const connection = getVoiceConnection(guildId);
         if (connection) {
             let video = await nextFromPlaylist(guildId);
+            logger.info("Next thing to play: " + JSON.stringify(video))
             await playVideo(guildId, video, connection);
         } else {
             logger.info("Can't play, not connected to voice");
@@ -130,6 +131,7 @@ const playVideo = async (guildId, video, connection) => {
         });
     } else {
         logger.info("No video to play");
+        connection
     }
 };
 
@@ -216,6 +218,12 @@ const handlePlay = async (interaction) => {
     } else {
         await interaction.deferReply();
         const query = interaction.options.getString("query");
+        try {
+            const url = new URL(query);
+            logger.info("got url: " + url.pathname);
+        } catch (error) {
+            logger.info("Query is not URL: " + query);
+        }
         const volume = interaction.options.getNumber("volume");
         let video = await searchList(youtube, query);
         video.title = he.decode(video.title);
@@ -294,6 +302,9 @@ const handleSkip = async (interaction) => {
 const handleClear = async (interaction) => {
     await db.flushAll();
     let connection = getVoiceConnection(interaction.guild.id);
+    if (connection) {
+        logger.info(Object.getOwnPropertyNames(connection));
+    }
     //TODO: stop audio player // connection.subscribe
     await interaction.reply("Cleared playlist and current song!");
 };
