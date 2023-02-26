@@ -4,7 +4,7 @@
     "description": "Music bot for discord",
     "main": "index.js",
     "scripts": {
-        "start": "yarn tsc index.ts && node index.js",
+        "dev": "yarn tsc -p tsconfig.json && node src/bot.js",
         "devDeploy": "node deploy-cmds.js guild",
         "prodDeploy": "node deploy-cmds.js global"
     },
