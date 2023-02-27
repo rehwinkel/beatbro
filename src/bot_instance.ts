@@ -1,10 +1,12 @@
-import { getVoiceConnection, joinVoiceChannel, VoiceConnection, VoiceConnectionStatus } from "@discordjs/voice";
+import { AudioPlayer, AudioPlayerStatus, AudioResource, createAudioPlayer, createAudioResource, getVoiceConnection, joinVoiceChannel, NoSubscriberBehavior, StreamType, VoiceConnection, VoiceConnectionStatus } from "@discordjs/voice";
 import { CacheType, CommandInteraction, GuildMember } from "discord.js";
 import { logger } from "./log";
 import { loadYoutubeClient, searchList } from "./youtube";
 import { promisify } from 'util';
 import { exec } from "child_process";
 import { basename } from "path";
+import { createHash } from "node:crypto";
+import { readFile, createReadStream } from "node:fs";
 
 const asyncExec = promisify(exec);
 const ytToken = process.env.YT_API_KEY as string;
@@ -16,7 +18,8 @@ interface StreamInformation {
     title: string,
     creator?: string,
     thumb?: URL,
-    volume: number
+    volume: number,
+    hash?: string
 }
 
 
@@ -78,18 +81,75 @@ async function obtainStreamInformation(query: string): Promise<StreamInformation
     }
 }
 
+function timeout(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
 class BotInstance {
     guildId: string;
-    connection: VoiceConnection | undefined;
+    connection?: VoiceConnection;
+    player?: AudioPlayer;
+    queue: Array<StreamInformation>;
 
     async checkConnected(): Promise<boolean> {
         this.connection = await getVoiceConnection(this.guildId);
         return this.connection?.state?.status === VoiceConnectionStatus.Ready;
     }
 
+    async isCurrentlyPlaying(): Promise<boolean> {
+        return this.player?.state.status === AudioPlayerStatus.Playing;
+    }
+
+    async playStream(stream: StreamInformation) {
+        const audioPlayer = createAudioPlayer({
+            behaviors: {
+                noSubscriber: NoSubscriberBehavior.Pause,
+            },
+        });
+        this.player = audioPlayer;
+        let resource: AudioResource;
+        let audioFile = createReadStream(stream.hash + ".opus");
+        if (stream.volume == 1) {
+            resource = createAudioResource(audioFile, { inputType: StreamType.OggOpus });
+        } else {
+            resource = createAudioResource(audioFile, { inputType: StreamType.OggOpus, inlineVolume: true });
+        }
+        resource.volume?.setVolume(stream.volume);
+        audioPlayer.play(resource);
+        this.connection = getVoiceConnection(this.guildId);
+        const subscription = this.connection?.subscribe(audioPlayer);
+        audioPlayer.on(AudioPlayerStatus.Idle, async () => {
+            logger.info("Player went idle");
+            await timeout(1000);
+            audioFile.close();
+            subscription?.unsubscribe();
+            await this.playNext(false);
+        });
+    }
+
+    async playNext(force: boolean) {
+        const stream: StreamInformation | undefined = this.queue.shift();
+        if (!stream) {
+            if (force) {
+                this.player?.stop();
+            }
+            return;
+        }
+        const currentlyPlaying = await this.isCurrentlyPlaying();
+        if (!currentlyPlaying || force) {
+            await this.playStream(stream);
+        } else {
+            this.queue.unshift(stream);
+        }
+    }
+
     async enqueueStream(stream: StreamInformation) {
         logger.info("Adding new stream to queue: " + JSON.stringify(stream));
-        // TODO: add stream to playlist, pick next stream from list and play it if not currently playing.
+        const hash: string = createHash("sha256").update(stream.streamUrl.toString()).digest("hex");
+        // TODO: caching
+        await asyncExec("ffmpeg -i \"" + stream.streamUrl + "\" " + hash + ".opus");
+        this.queue.push({ ...stream, hash });
+        await this.playNext(false);
     }
 
     getStreamMessage(stream: StreamInformation): string {
@@ -126,10 +186,12 @@ class BotInstance {
             await interaction.reply('You must be in a voice channel to use this command!');
         }
     }
+
     async leave(interaction: any) {
         this.connection?.disconnect();
         await interaction.reply("Goodbye!");
     }
+
     async play(interaction: any) {
         if (!await this.checkConnected()) {
             interaction.reply("Currently not connected to voice.");
@@ -155,18 +217,24 @@ class BotInstance {
         }
         this.enqueueStream({ ...streamInformation, volume });
     }
-    playlist(interaction: any) {
-        throw new Error("Method not implemented.");
+
+    async playlist(interaction: any) {
+        interaction.reply("STFU");
     }
-    skip(interaction: any) {
-        throw new Error("Method not implemented.");
+
+    async skip(interaction: any) {
+        await this.playNext(true);
+        interaction.reply("Skipped current song!");
     }
-    clear(interaction: any) {
-        throw new Error("Method not implemented.");
+
+    async clear(interaction: any) {
+        this.queue.splice(0, this.queue.length);
+        interaction.reply("Cleared current queue!");
     }
 
     constructor(guildId: string) {
         this.guildId = guildId;
+        this.queue = [];
     }
 }
 
