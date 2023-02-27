@@ -7,6 +7,7 @@ import { exec } from "child_process";
 import { basename } from "path";
 import { createHash } from "node:crypto";
 import { readFile, createReadStream } from "node:fs";
+import { OggCache } from "./cache";
 
 const asyncExec = promisify(exec);
 const ytToken = process.env.YT_API_KEY as string;
@@ -19,7 +20,7 @@ interface StreamInformation {
     creator?: string,
     thumb?: URL,
     volume: number,
-    hash?: string
+    path?: string,
 }
 
 
@@ -90,6 +91,7 @@ class BotInstance {
     connection?: VoiceConnection;
     player?: AudioPlayer;
     queue: Array<StreamInformation>;
+    cache: OggCache;
 
     async checkConnected(): Promise<boolean> {
         this.connection = await getVoiceConnection(this.guildId);
@@ -101,6 +103,7 @@ class BotInstance {
     }
 
     async playStream(stream: StreamInformation) {
+        logger.info("Now playing: '" + stream.title + "'")
         const audioPlayer = createAudioPlayer({
             behaviors: {
                 noSubscriber: NoSubscriberBehavior.Pause,
@@ -108,7 +111,7 @@ class BotInstance {
         });
         this.player = audioPlayer;
         let resource: AudioResource;
-        let audioFile = createReadStream(stream.hash + ".opus");
+        let audioFile = createReadStream(stream.path!!);
         if (stream.volume == 1) {
             resource = createAudioResource(audioFile, { inputType: StreamType.OggOpus });
         } else {
@@ -130,6 +133,7 @@ class BotInstance {
     async playNext(force: boolean) {
         const stream: StreamInformation | undefined = this.queue.shift();
         if (!stream) {
+            logger.info("Nothing left to play!");
             if (force) {
                 this.player?.stop();
             }
@@ -139,6 +143,7 @@ class BotInstance {
         if (!currentlyPlaying || force) {
             await this.playStream(stream);
         } else {
+            logger.info("Currently playing and no force")
             this.queue.unshift(stream);
         }
     }
@@ -146,9 +151,17 @@ class BotInstance {
     async enqueueStream(stream: StreamInformation) {
         logger.info("Adding new stream to queue: " + JSON.stringify(stream));
         const hash: string = createHash("sha256").update(stream.streamUrl.toString()).digest("hex");
-        // TODO: caching
-        await asyncExec("ffmpeg -i \"" + stream.streamUrl + "\" " + hash + ".opus");
-        this.queue.push({ ...stream, hash });
+        let destPath: string;
+        let entry = this.cache.getEntry(hash, "opus");
+        if (entry) {
+            destPath = entry;
+        } else {
+            destPath = this.cache.createEntry(hash, "opus");
+        }
+        logger.info("Downloading to " + destPath);
+        await asyncExec("ffmpeg -i \"" + stream.streamUrl + "\" " + destPath);
+        logger.info("Downloaded successfully");
+        this.queue.push({ ...stream, path: destPath });
         await this.playNext(false);
     }
 
@@ -234,6 +247,7 @@ class BotInstance {
 
     constructor(guildId: string) {
         this.guildId = guildId;
+        this.cache = new OggCache("cache/" + guildId);
         this.queue = [];
     }
 }
