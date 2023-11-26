@@ -1,6 +1,13 @@
-const { google } = require('googleapis');
+import { google } from 'googleapis';
 
-const searchList = async (youtube, query) => {
+interface Video {
+    videoId: string,
+    title: string,
+    creator: string,
+    thumb: URL,
+}
+
+const searchList = async (youtube, query: string): Promise<Video | undefined> => {
     const result = await youtube.search.list({
         "part": [
             "snippet"
@@ -19,13 +26,13 @@ const searchList = async (youtube, query) => {
         let thumb = video.snippet.thumbnails.medium.url;
         return { videoId, title, creator, thumb };
     }
-    return null;
+    return undefined;
 };
 
-const loadYoutubeClient = (ytApiKey) => {
+const loadYoutubeClient = (ytApiKey: string) => {
     return google.youtube({ version: 'v3', auth: ytApiKey });
 };
 
-module.exports = {
+export {
     loadYoutubeClient, searchList
 }
