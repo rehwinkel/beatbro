@@ -4,26 +4,23 @@
     "description": "Music bot for discord",
     "main": "index.js",
     "scripts": {
-        "dev": "yarn tsc -p tsconfig.json && node src/bot.js",
+        "dev": "tsc -p tsconfig.json && node src/bot.js",
         "devDeploy": "node deploy-cmds.js guild",
         "prodDeploy": "node deploy-cmds.js global"
     },
     "author": "Ian Rehwinkel",
     "license": "ISC",
     "dependencies": {
-        "@discordjs/builders": "^0.12.0",
-        "@discordjs/opus": "^0.5.3",
-        "@discordjs/rest": "^0.3.0",
-        "@discordjs/voice": "^0.8.0",
-        "async-exit-hook": "^2.0.1",
-        "discord-api-types": "^0.26.1",
-        "discord.js": "^13.6.0",
+        "@discordjs/opus": "^0.9.0",
+        "@discordjs/voice": "^0.16.1",
+        "discord-api-types": "^0.37.63",
+        "discord.js": "^14.14.1",
         "dotenv": "^14.3.2",
         "googleapis": "^92.0.0",
         "he": "^1.2.0",
         "libsodium-wrappers": "^0.7.9",
         "redis": "^4.0.2",
-        "typescript": "^4.9.5",
+        "typescript": "^5.2.2",
         "winston": "^3.5.0"
     }
 }

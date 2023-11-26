@@ -29,6 +29,7 @@ const getYoutubeStream = async (video: URL): Promise<{ streamUrl: URL, duration:
     let { stdout } = result;
     let info = JSON.parse(stdout);
     const durationSecs = info.duration;
+    // TODO: check if iterable
     for (let format of info.requested_formats) {
         if (format.width == null && format.height == null) {
             return { duration: durationSecs, streamUrl: new URL(format.url) };
@@ -109,6 +110,7 @@ class BotInstance {
                 noSubscriber: NoSubscriberBehavior.Pause,
             },
         });
+
         this.player = audioPlayer;
         let resource: AudioResource;
         let audioFile = createReadStream(stream.path!!);

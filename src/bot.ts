@@ -3,10 +3,14 @@ dotenvConfig();
 const token = process.env.BOT_TOKEN;
 
 import { BotInstance } from "./bot_instance";
-import { Client, Intents } from "discord.js";
+import { Client } from "discord.js";
 import { logger } from "./log";
+import { GatewayIntentBits } from 'discord-api-types/v9';
 
-const client = new Client({ intents: [Intents.FLAGS.GUILDS, Intents.FLAGS.GUILD_VOICE_STATES] });
+const client = new Client({
+    intents: GatewayIntentBits.Guilds
+        | GatewayIntentBits.GuildVoiceStates
+});
 
 client.once('ready', () => {
     logger.info("Bot ready!");
