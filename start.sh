@@ -1,0 +1,1 @@
+docker run -v /tmp/bot_cache:/work/cache --env-file .env -it beatbro

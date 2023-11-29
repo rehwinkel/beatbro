@@ -1,16 +1,39 @@
-FROM node:17.4.0-alpine3.15
+FROM node:21-bullseye-slim as build
 
-RUN apk add opus ffmpeg python3 make gcc musl-dev g++ redis
-RUN ln -sfv /usr/bin/python3 /usr/bin/python
-RUN adduser -D botuser
-USER botuser
-WORKDIR /home/botuser/
+WORKDIR /work
 
-COPY package.json youtube-dl ./
+RUN apt-get update && apt-get install -y \
+    libopus-dev \
+    ffmpeg \
+    python3 \
+    python-is-python3 \
+    python3-pip \
+    make \
+    g++ \
+ && rm -rf /var/lib/apt/lists/*
 
-RUN npm config set unsafe-perm true
+ADD src /work/src
+ADD vendor /work/vendor
+COPY package.json tsconfig.json /work/
+RUN ln -sfv /work/vendor/yt-dlp/dist/yt-dlp_linux yt-dlp
+
 RUN npm install
+RUN npm run build
 
-COPY index.js youtube.js run.sh .env ./
+WORKDIR /work/vendor/yt-dlp
+RUN rm dist/*
+RUN python3 -m pip install -U pyinstaller -r requirements.txt
+RUN python3 pyinst.py
 
-CMD ["./run.sh"]
+FROM node:21-bullseye-slim
+
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    python3 \
+    python-is-python3 \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /work
+COPY --from=build /work/ /work/
+
+CMD ["npm", "run", "start"]

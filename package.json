@@ -4,6 +4,8 @@
     "description": "Music bot for discord",
     "main": "index.js",
     "scripts": {
+        "build": "tsc -p tsconfig.json",
+        "start": "node src/bot.js",
         "dev": "tsc -p tsconfig.json && node src/bot.js",
         "devDeploy": "node deploy-cmds.js guild",
         "prodDeploy": "node deploy-cmds.js global"
