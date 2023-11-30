@@ -3,7 +3,7 @@ dotenvConfig();
 const token = process.env.BOT_TOKEN;
 
 import { BotInstance } from "./bot_instance";
-import { Client } from "discord.js";
+import { ActivityType, Client } from "discord.js";
 import { logger } from "./log";
 import { GatewayIntentBits } from 'discord-api-types/v9';
 
@@ -14,6 +14,11 @@ const client = new Client({
 
 client.once('ready', () => {
     logger.info("Bot ready!");
+
+    client.user?.setActivity({
+        name: "sick beats",
+        type: ActivityType.Playing
+    });
 });
 
 const bots = new Map<string, BotInstance>();
