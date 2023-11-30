@@ -92,6 +92,7 @@ class BotInstance {
     connection?: VoiceConnection;
     player?: AudioPlayer;
     queue: Array<StreamInformation>;
+    currentSong: StreamInformation | null = null;
     cache: OggCache;
 
     async checkConnected(): Promise<boolean> {
@@ -104,7 +105,8 @@ class BotInstance {
     }
 
     async playStream(stream: StreamInformation) {
-        logger.info("Now playing: '" + stream.title + "'")
+        logger.info("Now playing: '" + stream.title + "'");
+        this.currentSong = stream;
         const audioPlayer = createAudioPlayer({
             behaviors: {
                 noSubscriber: NoSubscriberBehavior.Pause,
@@ -136,6 +138,7 @@ class BotInstance {
         const stream: StreamInformation | undefined = this.queue.shift();
         if (!stream) {
             logger.info("Nothing left to play!");
+            this.currentSong = null;
             if (force) {
                 this.player?.stop();
             }
@@ -234,7 +237,30 @@ class BotInstance {
     }
 
     async playlist(interaction: any) {
-        interaction.reply("STFU");
+        logger.info("Playlist is: " + JSON.stringify(this.queue));
+
+        let currentlyPlaying: string;
+        if (this.currentSong) {
+            const creatorString = this.currentSong.creator ? ` by "${this.currentSong.creator}" ` : "";
+            currentlyPlaying = `## Currently playing "${this.currentSong.title}"${creatorString}! :notes:\n\n`;
+        } else {
+            currentlyPlaying = "## Currently not playing anything! :notes:\n\n";
+        }
+
+        if (this.queue.length == 0) {
+            interaction.reply(currentlyPlaying + "No songs in playlist!")
+        } else {
+            let top: string = "### Current playlist:\n";
+            let list: string = this.queue.map((stream, idx) => {
+                const creatorString = stream.creator ? ` by "${stream.creator}"` : "";
+                const minutes = stream.duration ? Math.floor(stream.duration / 60) : 0;
+                const seconds = stream.duration ? stream.duration % 60 : 0;
+                const secondsString = seconds < 10 ? "0" + seconds : seconds;
+                const durationString = stream.duration ? ` (${minutes}:${secondsString})` : "";
+                return `${idx + 1}. "${stream.title}"${creatorString}${durationString}`;
+            }).join("\n");
+            interaction.reply(currentlyPlaying + top + list);
+        }
     }
 
     async skip(interaction: any) {
